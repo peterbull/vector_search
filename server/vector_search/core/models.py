@@ -208,8 +208,9 @@ class JobDescriptionChunk(AbstractBaseModel):
         JobDescription, on_delete=models.CASCADE, related_name="chunks"
     )
     chunk = models.TextField()
+    token_count = models.IntegerField(null=True)
     embedding = VectorField(dimensions=384)
 
     def __str__(self):
-        return f"{self.job_description.title} - {self.chunk_type} - {self.chunk[:50]}"
+        return f"{self.job_description.title} - {self.chunk[:50]}"
 
