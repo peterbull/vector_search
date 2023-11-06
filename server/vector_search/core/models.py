@@ -75,6 +75,7 @@ class User(AbstractUser, AbstractBaseModel):
     class Meta:
         ordering = ["email"]
 
+
 # Create Job Description model
 class JobDescription(AbstractBaseModel):
     """A Job Description"""
@@ -89,3 +90,14 @@ class JobDescription(AbstractBaseModel):
 
     def __str__(self):
         return self.title
+
+
+class JobDescriptionChunk(AbstractBaseModel):
+    job_description = models.ForeignKey(
+        JobDescription, on_delete=models.CASCADE, related_name="chunks"
+    )
+    chunk = models.TextField()
+    embedding = models.TextField()
+
+    def __str__(self):
+        return f"{self.job_description.title} - {self.chunk_type} - {self.chunk[:50]}"
