@@ -5,6 +5,9 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth.tokens import default_token_generator
 from django.db import models
 
+from pgvector.django import VectorExtension
+from pgvector.django import VectorField
+
 from vector_search.common.models import AbstractBaseModel
 from vector_search.utils.sites import get_site_url
 
@@ -97,7 +100,7 @@ class JobDescriptionChunk(AbstractBaseModel):
         JobDescription, on_delete=models.CASCADE, related_name="chunks"
     )
     chunk = models.TextField()
-    embedding = models.TextField()
+    embedding = VectorField(dimensions=384)
 
     def __str__(self):
         return f"{self.job_description.title} - {self.chunk_type} - {self.chunk[:50]}"
