@@ -74,3 +74,18 @@ class User(AbstractUser, AbstractBaseModel):
 
     class Meta:
         ordering = ["email"]
+
+# Create Job Description model
+class JobDescription(AbstractBaseModel):
+    """A Job Description"""
+
+    title = models.CharField(max_length=255)
+    company = models.CharField(max_length=255)
+    location = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    skills = models.TextField(blank=True)
+    language = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.title
