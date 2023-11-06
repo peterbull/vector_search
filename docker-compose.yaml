@@ -7,9 +7,9 @@ volumes:
 services:
   postgres:
     restart: always
-    image: postgres:12
+    image: ankane/pgvector
     ports:
-      - 5432:5432
+      - 56432:5432
     env_file:
       - ".env"
     environment:
