@@ -1,9 +1,15 @@
+import os
+import glob
+import csv
+
 import logging
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth.tokens import default_token_generator
 from django.db import models
+from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
 
 from pgvector.django import VectorExtension
 from pgvector.django import VectorField
@@ -88,10 +94,47 @@ class JobDescription(AbstractBaseModel):
     location = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     skills = models.TextField(blank=True)
-    language = models.CharField(max_length=255)
+    language = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
         return self.title
+    
+    @classmethod
+    def import_job_description(cls):
+        def get_jobs_csv():
+            """Find all the CSV files in the jobs directory and return them as a generator"""
+            data_directory = os.path.join(settings.BASE_DIR, "..", "data", "jobs")
+            csv_paths = glob.glob(f"{data_directory}/*.csv")
+            for csv_path in csv_paths:
+                with open(csv_path, "r") as f:
+                    yield f
+
+        for csvfile in get_jobs_csv():
+            print(f"Loading {csvfile.name}...")
+            start_time = time.time()
+
+            csvreader = csv.DictReader(csvfile, delimiter=",")
+
+            job_descriptions = []
+            for row in csvreader:
+                # try:
+                #     language = detect(row["description"])
+                # except LangDetectException:
+                #     language = ""
+                job_descriptions.append(
+                    cls(
+                        title=row["title"],
+                        company=row["company"],
+                        location=row["location"],
+                        description=row["description"],
+                        skills=row["skills"],
+                        # language=language,
+                    )
+                )
+
+            cls.objects.bulk_create(job_descriptions)
+
+            print(f"    Loaded in {time.time() - start_time} seconds.")
 
 
 class JobDescriptionChunk(AbstractBaseModel):
