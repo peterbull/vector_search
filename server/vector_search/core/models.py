@@ -136,6 +136,27 @@ class JobDescription(AbstractBaseModel):
 
             print(f"    Loaded in {time.time() - start_time} seconds.")
 
+    @classmethod
+    def detect_languages(cls):
+        def get_job_descriptions():
+            page_size = 1000
+            num_pages = cls.objects.count() // page_size + 1
+            for page in range(num_pages):
+                qs = cls.objects.filter(language="")[page * page_size: (page + 1) * page_size]
+                for job_description in qs:
+                    yield job_description
+
+        count = 0
+        total_jds = cls.objects.filter(language="").count()
+        for job_description in get_job_descriptions():
+            count += 1
+            print(f"Detecting language for JD #{count} of {total_jds}...")
+            try:
+                language = detect(job_description.description)
+            except LangDetectException:
+                language = ""
+            job_description.language = language
+            job_description.save()
 
 class JobDescriptionChunk(AbstractBaseModel):
     job_description = models.ForeignKey(
