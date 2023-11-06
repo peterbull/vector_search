@@ -6,21 +6,15 @@ import os
 import re
 import time
 
-import logging
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth.tokens import default_token_generator
 from django.db import models
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
-
-from pgvector.django import VectorExtension
-from pgvector.django import VectorField
-
+from pgvector.django import L2Distance, VectorField
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
-
 from vector_search.common.models import AbstractBaseModel
 from vector_search.utils.sites import get_site_url
 
@@ -92,10 +86,7 @@ class User(AbstractUser, AbstractBaseModel):
         ordering = ["email"]
 
 
-# Create Job Description model
 class JobDescription(AbstractBaseModel):
-    """A Job Description"""
-
     title = models.CharField(max_length=255)
     company = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -105,12 +96,12 @@ class JobDescription(AbstractBaseModel):
 
     def __str__(self):
         return self.title
-    
+
     @classmethod
-    def import_job_description(cls):
+    def import_job_descriptions(cls):
         def get_jobs_csv():
             """Find all the CSV files in the jobs directory and return them as a generator"""
-            data_directory = os.path.join(settings.BASE_DIR, "..", "data", "jobs")
+            data_directory = os.path.join(settings.BASE_DIR, "..", "..", "data", "jobs")
             csv_paths = glob.glob(f"{data_directory}/*.csv")
             for csv_path in csv_paths:
                 with open(csv_path, "r") as f:
@@ -203,10 +194,39 @@ class JobDescription(AbstractBaseModel):
 
         JobDescriptionChunk.objects.bulk_create(jd_chunks)
 
+    @classmethod
+    def search(cls, query=None):
+        query = (
+            query
+            or "The student would prefer a job in the arts. They have a background in choir and theater. Major: Music. Minor: Theater. Graduating Year: 2022"
+        )
+        # > expected result: list of Job Descriptions in descending order of relevance
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        query_embedding = model.encode(query)
+
+        jd_chunks = JobDescriptionChunk.objects.annotate(distance=L2Distance("embedding", query_embedding)).order_by("distance")
+
+        unique_jds = {}
+        for chunk in jd_chunks:
+            if chunk.job_description.id not in unique_jds:
+                unique_jds[chunk.job_description.id] = {
+                    "job_description": chunk.job_description,
+                    "chunks": [chunk],
+                }
+            else:
+                unique_jds[chunk.job_description.id]["chunks"].append(chunk)
+
+        results = []
+        for k, v in unique_jds.items():
+            score = sum([c.distance for c in v["chunks"]]) / len(v["chunks"])
+            job_description = v["job_description"]
+            results.append(JobDescriptionSearchResult(score, job_description, v["chunks"]))
+
+        return sorted(results, key=lambda r: r.score)
+
+
 class JobDescriptionChunk(AbstractBaseModel):
-    job_description = models.ForeignKey(
-        JobDescription, on_delete=models.CASCADE, related_name="chunks"
-    )
+    job_description = models.ForeignKey(JobDescription, on_delete=models.CASCADE, related_name="chunks")
     chunk = models.TextField()
     token_count = models.IntegerField(null=True)
     embedding = VectorField(dimensions=384)
@@ -214,3 +234,12 @@ class JobDescriptionChunk(AbstractBaseModel):
     def __str__(self):
         return f"{self.job_description.title} - {self.chunk[:50]}"
 
+
+class JobDescriptionSearchResult:
+    def __init__(self, score, job_description, chunks):
+        self.score = score
+        self.job_description = job_description
+        self.chunks = chunks
+
+    def __str__(self):
+        return f"{self.score}: {self.job_description.title}"
