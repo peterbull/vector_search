@@ -227,5 +227,8 @@ tags
 .pytest_cache/
 
 
-# Remove Github Actions
+# Github Actions
 .github
+
+# Temporary Files
+peter_temp
