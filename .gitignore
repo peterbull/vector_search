@@ -225,3 +225,7 @@ tags
 .idea/
 
 .pytest_cache/
+
+
+# Remove Github Actions
+.github
