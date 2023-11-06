@@ -31,6 +31,7 @@ drf-nested-routers = "==0.93.3"
 django-anymail = "==8.4"  # https://github.com/anymail/django-anymail
 rollbar = "==0.16.2"
 premailer = "*"
+sentence-transformers = "*"
 
 [requires]
 python_version = "3.10"

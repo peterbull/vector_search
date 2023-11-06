@@ -1,6 +1,10 @@
-import os
-import glob
 import csv
+import glob
+import html
+import logging
+import os
+import re
+import time
 
 import logging
 
@@ -13,6 +17,9 @@ from langdetect.lang_detect_exception import LangDetectException
 
 from pgvector.django import VectorExtension
 from pgvector.django import VectorField
+
+from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer
 
 from vector_search.common.models import AbstractBaseModel
 from vector_search.utils.sites import get_site_url
@@ -158,6 +165,44 @@ class JobDescription(AbstractBaseModel):
             job_description.language = language
             job_description.save()
 
+    def generate_embeddings(self):
+        def strip_html_tags(text):
+            tag_re = re.compile(r"(<!--.*?-->|<[^>]*>)")
+            no_tags = tag_re.sub("", text)
+            return html.escape(no_tags)
+
+        def get_chunks(jd_content, chunk_size=750):
+            """Naive chunking of job description.
+
+            `chunk_size` is the number of characters per chunk.
+            """
+            chunk_size = chunk_size
+            content = strip_html_tags(jd_content).replace("\n", " ")
+            while content:
+                chunk, content = content[:chunk_size], content[chunk_size:]
+                yield chunk
+
+        # 1. Set up the embedding model
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+
+        # 2. Chunk the job description into sentences
+        chunk_embeddings = ((c, tokenizer.tokenize(c), model.encode(c)) for c in get_chunks(self.description))
+
+        # 3. Save the embeddings information for each chunk
+        jd_chunks = []
+        for chunk_content, chunk_tokens, chunk_embedding in chunk_embeddings:
+            jd_chunks.append(
+                JobDescriptionChunk(
+                    job_description=self,
+                    chunk=chunk_content,
+                    token_count=len(chunk_tokens),
+                    embedding=chunk_embedding,
+                )
+            )
+
+        JobDescriptionChunk.objects.bulk_create(jd_chunks)
+
 class JobDescriptionChunk(AbstractBaseModel):
     job_description = models.ForeignKey(
         JobDescription, on_delete=models.CASCADE, related_name="chunks"
@@ -167,3 +212,4 @@ class JobDescriptionChunk(AbstractBaseModel):
 
     def __str__(self):
         return f"{self.job_description.title} - {self.chunk_type} - {self.chunk[:50]}"
+

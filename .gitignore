@@ -232,3 +232,7 @@ tags
 
 # Temporary Files
 peter_temp
+
+# venv
+vector_search/bin/
+vector_search/lib64
