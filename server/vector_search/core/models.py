@@ -89,7 +89,6 @@ class JobDescription(AbstractBaseModel):
     description = models.TextField(blank=True)
     skills = models.TextField(blank=True)
     language = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title
